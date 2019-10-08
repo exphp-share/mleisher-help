@@ -119,14 +119,10 @@ fn scan_database(prog: &str, now: &DateTime<Local>, emap: &HashMap<String, Mac>)
                 continue 'outer;
             }
         }
-        let l = line.as_str().split("%").
-            enumerate().
-            filter(|&(i,_)|  i == 0 || i == 1 || i == 8).
-            map(|(_,f)| f);
-        let fvec: Vec<&str> = l.collect();
+        let fvec: Vec<&str> = line.as_str().splitn(10, "%").collect();
         let ip   = fvec[0];
         let host = fvec[1];
-        let mac = fvec[2].replace("-","").to_uppercase();
+        let mac = fvec[8].replace("-", "").to_uppercase();
         match emap.get(&mac) {
             Some(v) => {
                 let n: u32;

@@ -79,13 +79,13 @@ fn load_switch_history(prog: &str, emap: &mut HashMap<String, Mac>) {
 //
 // Function to determine the number of months between two dates.
 //
-fn nm(start: &String, end: Option<&String>, now: &DateTime<Local>) -> u32 {
+fn nm(start: &str, end: Option<&str>, now: &DateTime<Local>) -> u32 {
     let ey: u32;
     let em: u32;
-    let s = NaiveDateTime::parse_from_str(start.as_str(), "%Y%m%d_%H%M%S").unwrap();
+    let s = NaiveDateTime::parse_from_str(start, "%Y%m%d_%H%M%S").unwrap();
 
-    if !end.is_none() {
-        let edt = NaiveDateTime::parse_from_str(end.unwrap().as_str(), "%Y%m%d_%H%M%S").unwrap();
+    if let Some(end) = end {
+        let edt = NaiveDateTime::parse_from_str(end, "%Y%m%d_%H%M%S").unwrap();
         ey = edt.year() as u32;
         em = edt.month() as u32;
     } else {
@@ -117,11 +117,9 @@ fn scan_database(prog: &str, now: &DateTime<Local>, emap: &HashMap<String, Mac>)
             },
             Ok(infile) => infile,
         };
-        let mut lno: u32 = 1;
         let reader = BufReader::new(infile);
-        'outer: for line_result in reader.lines() {
-            println!("Line: {}", lno);
-            lno += 1;
+        'outer: for (lno, line_result) in reader.lines().enumerate() {
+            println!("Line: {}", lno + 1);
             let line = line_result.unwrap();
             for r in &res {
                 if r.is_match(line.as_str()) {
@@ -135,9 +133,8 @@ fn scan_database(prog: &str, now: &DateTime<Local>, emap: &HashMap<String, Mac>)
             let fvec: Vec<&str> = l.collect();
             let ip   = fvec[0];
             let host = fvec[1];
-            let mac_string = fvec[2].replace("-","").to_uppercase();
-            let mac  = mac_string.as_str();
-            match emap.get(&mac_string) {
+            let mac = fvec[2].replace("-","").to_uppercase();
+            match emap.get(&mac) {
                 Some(v) => {
                     let n: u32;
                     if v.dates.len() == 1 {

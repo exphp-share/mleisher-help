@@ -44,35 +44,31 @@ impl Mac {
 //
 fn load_switch_history(prog: &str, emap: &mut HashMap<String, Mac>) {
     let re = Regex::new(r"^(\d+)_\d+\s+\S+\s+\S+\s+\S+\s+(([0-9A-F]+,?)+)").unwrap();
-    //
-    // Do the following as a block so the file will be closed.
-    //
-    {
-        let infile = match File::open(SWITCH_HISTORY) {
-            Err(_why) => {
-                println!("{}: unable to open switchwalk history '{}': {}",
-                         prog, SWITCH_HISTORY, _why);
-                process::exit(1)
+
+    let infile = match File::open(SWITCH_HISTORY) {
+        Err(_why) => {
+            println!("{}: unable to open switchwalk history '{}': {}",
+                        prog, SWITCH_HISTORY, _why);
+            process::exit(1)
+        },
+        Ok(infile) => infile,
+    };
+    let reader = BufReader::new(infile);
+    for line in reader.lines() {
+        let l = line.unwrap();
+        match re.captures(l.as_str()) {
+            Some(x) => {
+                let date = x[1].to_owned();;
+                let mac = x[2].to_owned();
+                let e = emap.entry(mac).or_insert(Mac::new());
+                if e.dates.len() == 2 {
+                    e.dates.pop();
+                }
+                e.dates.push(date);
+                e.count += 1;
             },
-            Ok(infile) => infile,
+            None => (),
         };
-        let reader = BufReader::new(infile);
-        for line in reader.lines() {
-            let l = line.unwrap();
-            match re.captures(l.as_str()) {
-                Some(x) => {
-                    let date = x[1].to_owned();;
-                    let mac = x[2].to_owned();
-                    let e = emap.entry(mac).or_insert(Mac::new());
-                    if e.dates.len() == 2 {
-                        e.dates.pop();
-                    }
-                    e.dates.push(date);
-                    e.count += 1;
-                },
-                None => (),
-            };
-        }
     }
 }
 
@@ -106,50 +102,46 @@ fn scan_database(prog: &str, now: &DateTime<Local>, emap: &HashMap<String, Mac>)
     let res: [Regex; 3] = [ Regex::new(r"^#").unwrap(),
                             Regex::new(r"^\s*$").unwrap(),
                             Regex::new(r"host13|host42").unwrap() ];
-    //
-    // Wrap in brackets to automatically close the file when it goes out of scope.
-    //
-    {
-        let infile = match File::open(DATABASE) {
-            Err(_why) => {
-                println!("{}: unable to open host database '{}': {}", prog, DATABASE, _why);
-                process::exit(1)
-            },
-            Ok(infile) => infile,
-        };
-        let reader = BufReader::new(infile);
-        'outer: for (lno, line_result) in reader.lines().enumerate() {
-            println!("Line: {}", lno + 1);
-            let line = line_result.unwrap();
-            for r in &res {
-                if r.is_match(line.as_str()) {
-                    continue 'outer;
-                }
-            }
-            let l = line.as_str().split("%").
-                enumerate().
-                filter(|&(i,_)|  i == 0 || i == 1 || i == 8).
-                map(|(_,f)| f);
-            let fvec: Vec<&str> = l.collect();
-            let ip   = fvec[0];
-            let host = fvec[1];
-            let mac = fvec[2].replace("-","").to_uppercase();
-            match emap.get(&mac) {
-                Some(v) => {
-                    let n: u32;
-                    if v.dates.len() == 1 {
-                        n = nm(&v.dates[0], None, now);
-                    } else {
-                        n = nm(&v.dates[0], Some(&v.dates[1]), now);
-                    }
-                    if n >= NMONTHS {
-                        println!("DING! {} {} {} Months: {}", ip, host, mac, n);
-                    }
-                },
-                None => ()
-            };
-        }
+
+    let infile = match File::open(DATABASE) {
+        Err(_why) => {
+            println!("{}: unable to open host database '{}': {}", prog, DATABASE, _why);
+            process::exit(1)
+        },
+        Ok(infile) => infile,
     };
+    let reader = BufReader::new(infile);
+    'outer: for (lno, line_result) in reader.lines().enumerate() {
+        println!("Line: {}", lno + 1);
+        let line = line_result.unwrap();
+        for r in &res {
+            if r.is_match(line.as_str()) {
+                continue 'outer;
+            }
+        }
+        let l = line.as_str().split("%").
+            enumerate().
+            filter(|&(i,_)|  i == 0 || i == 1 || i == 8).
+            map(|(_,f)| f);
+        let fvec: Vec<&str> = l.collect();
+        let ip   = fvec[0];
+        let host = fvec[1];
+        let mac = fvec[2].replace("-","").to_uppercase();
+        match emap.get(&mac) {
+            Some(v) => {
+                let n: u32;
+                if v.dates.len() == 1 {
+                    n = nm(&v.dates[0], None, now);
+                } else {
+                    n = nm(&v.dates[0], Some(&v.dates[1]), now);
+                }
+                if n >= NMONTHS {
+                    println!("DING! {} {} {} Months: {}", ip, host, mac, n);
+                }
+            },
+            None => ()
+        };
+    }
 }
 
 fn main() {
